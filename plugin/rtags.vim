@@ -172,9 +172,27 @@ function! rtags#ParseResults(results)
         let [location; rest] = split(record, '\s\+')
         let [file, lnum, col] = rtags#parseSourceLocation(location)
 
+        let mod = ":t"
+        let prefix = ""
+
+        while 1
+            let curDir = fnamemodify(getcwd(),mod)."/"
+            if curDir == "/"
+                break
+            endif
+
+            if match(file, curDir) != -1
+                let file = prefix . split(file,curDir)[-1]
+                break
+            endif
+            let mod = ":h" . mod
+            let prefix = "../" . prefix
+        endwhile
+
         let entry = {}
         "        let entry.bufn = 0
-        let entry.filename = substitute(file, getcwd().'/', '', 'g')
+        "let entry.filename = substitute(file, getcwd().'/', '', 'g')
+        let entry.filename = file
         let entry.filepath = file
         let entry.lnum = lnum
         "        let entry.pattern = ''
@@ -295,7 +313,7 @@ endfunction
 
 function! rtags#getRcCmd()
     let cmd = g:rtagsRcCmd
-    let cmd .= " --absolute-path "
+    "let cmd .= " --absolute-path "
     if g:rtagsExcludeSysHeaders == 1
         return cmd." -H "
     endif
@@ -304,7 +322,12 @@ endfunction
 
 function! rtags#getCurrentLocation()
     let [lnum, col] = getpos('.')[1:2]
-    return printf("%s:%s:%s", expand("%:p"), lnum, col)
+    "if !exists("g:rtagsSendRelPath")
+    "    return printf("%s:%s:%s", expand("%:p"), lnum, col)
+    "else
+    "    return printf("%s:%s:%s", "%:p", lnum, col)
+    "endif
+    return printf("%s:%s:%s", expand("%"), lnum, col)
 endfunction
 
 function! rtags#SymbolInfoHandler(output)
@@ -395,9 +418,9 @@ function! rtags#parseSourceLocation(string)
     if len(splittedLine) == 3
         let [jump_file, lnum, col; rest] = splittedLine
         " Must be a path, therefore leading / is compulsory
-        if jump_file[0] == '/'
-            return [jump_file, lnum, col]
-        endif
+        "if jump_file[0] == '/'
+        "endif
+        return [jump_file, lnum, col]
     endif
     return ["","",""]
 endfunction
