@@ -172,22 +172,7 @@ function! rtags#ParseResults(results)
         let [location; rest] = split(record, '\s\+')
         let [file, lnum, col] = rtags#parseSourceLocation(location)
 
-        let mod = ":t"
-        let prefix = ""
-
-        while 1
-            let curDir = fnamemodify(getcwd(),mod)."/"
-            if curDir == "/"
-                break
-            endif
-
-            if match(file, curDir) != -1
-                let file = prefix . split(file,curDir)[-1]
-                break
-            endif
-            let mod = ":h" . mod
-            let prefix = "../" . prefix
-        endwhile
+        let file = rtags#fixUpFile(file)
 
         let entry = {}
         "        let entry.bufn = 0
@@ -322,12 +307,12 @@ endfunction
 
 function! rtags#getCurrentLocation()
     let [lnum, col] = getpos('.')[1:2]
+    return printf("%s:%s:%s", expand("%"), lnum, col)
     "if !exists("g:rtagsSendRelPath")
     "    return printf("%s:%s:%s", expand("%:p"), lnum, col)
     "else
     "    return printf("%s:%s:%s", "%:p", lnum, col)
     "endif
-    return printf("%s:%s:%s", expand("%"), lnum, col)
 endfunction
 
 function! rtags#SymbolInfoHandler(output)
@@ -368,6 +353,28 @@ function! rtags#jumpToLocationInternal(file, line, col)
     endtry
 endfunction
 
+function! rtags#fixUpFile(filein)
+    let mod = ":t"
+    let prefix = ""
+    let file = a:filein
+
+    while 1
+        let curDir = fnamemodify(getcwd(),mod)."/"
+        if curDir == "/"
+            break
+        endif
+
+        if match(file, curDir) != -1
+            let file = prefix . split(file,curDir)[-1]
+            break
+        endif
+        let mod = ":h" . mod
+        let prefix = "../" . prefix
+    endwhile
+    return file
+endfunction
+
+
 function! rtags#JumpToHandler(results, args)
     let results = a:results
     let open_opt = a:args['open_opt']
@@ -380,6 +387,10 @@ function! rtags#JumpToHandler(results, args)
     elseif len(results) == 1
         let [location; symbol_detail] = split(results[0], '\s\+')
         let [jump_file, lnum, col; rest] = split(location, ':')
+
+        let jump_file = rtags#fixUpFile(jump_file)
+
+        " TODO split
 
         " Add location to the jumplist
         normal! m'
@@ -455,6 +466,9 @@ function! rtags#JumpToParentHandler(results)
             continue
         endif
         let [jump_file, lnum, col] = rtags#parseSourceLocation(line[matched:-1])
+
+        let jump_file = rtags#fixUpFile(jump_file)
+
         if !empty(jump_file)
             if a:0 > 0
                 call rtags#cloneCurrentBuffer(a:1)
